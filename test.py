@@ -1,20 +1,20 @@
+import tqdm.utils
 from lib.audio import Song, get_song_list
+import concurrent.futures
+import tqdm
+import typing
 
-for i, s in enumerate(get_song_list()):
-	print(i, s.get("cid"), s.get("name"))
+def download_audio(cid: str) -> None:
+	s = Song(cid)
+	s.full_download()
 
-s = Song("514533")
-print("ABM_CID:", s.album_cid)
-print("ABM_TIT:", s.album_title)
-print("ABM_COV:", s.album_cover_url)
-print("ABM_CDE:", s.album_cover_de_url)
-# print("ABM_SNG:", s.album_songs)
-print("SNG_CID:", s.song_cid)
-print("SNG_TIT:", s.song_title)
-print("SNG_AID:", s.song_album_cid)
-print("SNG_URL:", s.song_url)
-print("SNG_LYR:", s.lyrics_url)
-print("SNG_MVC:", s.song_mv_cover_url)
-print("SNG_INT:", s.song_artists)
-print("SNG_POS:", s.song_position)
-print("SNG_YÆR:", s.song_year)
+def interp(x: float, x1: float, x2: float, y1: float, y2: float) -> float:
+		return y1+((y2-y1)/(x2-x1))*(x-x1)
+
+jobs: list[typing.Any | None] = [(s.get("cid")) for s in get_song_list()[::-1]]
+with concurrent.futures.ThreadPoolExecutor() as exector:
+	workers: typing.Iterator[None] = exector.map(download_audio, jobs)
+	pbar = tqdm.tqdm(workers, total=len(jobs), position=0, ascii=".#", colour="#00ff00")
+	# for i, w in enumerate(workers):
+	# 	pbar.update(i)
+	list(pbar)

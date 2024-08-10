@@ -1,0 +1,6 @@
+requests
+mutagen
+ytmusicapi
+colorama
+tqdm
+ffmpeg_progress_yield

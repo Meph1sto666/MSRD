@@ -31,6 +31,9 @@ def get_song_list() -> list[dict[str, typing.Any]]:
 		raise Exception("No songs found in list")
 	return song_list
 
+def is_downloaded(cid: str) -> bool:
+	return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{cid}.flac")
+
 class Song:
 	def __init__(self, song_id: str, year_check: bool = True) -> None:
 		self.song_data:dict[str, typing.Any] = _request_song_info(song_id)
@@ -63,6 +66,8 @@ class Song:
 		self.__cover_codec: str = os.path.splitext(self.song_mv_cover_url or self.album_cover_url)[1]		
 		self.__lyrics_ext: str | None = os.path.splitext(self.lyrics_url)[1] if self.lyrics_url else None
 
+	def is_downloaded(self) -> bool:
+		return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{self.song_cid}.flac")
 
 	def download_song(self) -> None:
 		if not self.song_url:
@@ -146,6 +151,7 @@ class Song:
 		jobs: list[typing.Callable[[], None]] = [self.download_song, self.download_cover, self.download_lyrics, self.convert_to_flac, self.add_metadata]
 		for j in jobs:
 			j()
+		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}.flac", f"./{os.getenv('LIBRARY_DIR')}/{self.song_cid}.flac")
 
 	def __get_song_position(self) -> int:
 		for i, song in enumerate(self.album_songs):

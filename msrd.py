@@ -1,6 +1,6 @@
 import tqdm.utils
 import typer.rich_utils
-from lib.audio import Song, get_song_list
+from lib.audio import Song, get_song_list, is_downloaded
 import concurrent.futures
 import tqdm
 import typing
@@ -9,10 +9,12 @@ from dotenv import load_dotenv
 from typing_extensions import Annotated, Optional
 from lib.commands import cache as cache_command
 import typer.core
-
+import os
+import colorama
 load_dotenv()
 
 cli = typer.Typer()
+os.makedirs(os.getenv('LIBRARY_DIR', "./library/flac/"), exist_ok=True)
 # typer.core.rich = None
 
 def download_audio(cid: str) -> None:
@@ -23,13 +25,19 @@ def download_audio(cid: str) -> None:
 def download(
 		ids: Annotated[Optional[list[str]], typer.Argument(help="Download the specified songs by their ID (format: ID1 ID2 ID3...)")] = None,
 		dw_all: Annotated[Optional[bool], typer.Option("--all", "-a", help="Download the entire discography of MSR.")] = False,
+		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already downloaded files")] = False,
 		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel downloads")] = None) -> None:
 	if not ids and not dw_all:
 		typer.pause(f"Please specify the song(s) you want to download. Press any key to continue...")
 		return
 	jobs: list[typing.Any | None] = []
 	if dw_all:
-		jobs = [(s.get("cid")) for s in get_song_list()[::-1]]
+		for s in get_song_list()[::-1]:
+			cid: str | None = s.get("cid")
+			if not force and (not cid or is_downloaded(cid)):
+				print(f"{colorama.Fore.LIGHTBLUE_EX}INFO{colorama.Fore.RESET}: skipping [{cid}], already downloaded")
+				continue
+			jobs.append(cid)
 	else:
 		assert ids is not None
 		jobs = ids

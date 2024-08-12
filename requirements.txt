@@ -4,3 +4,5 @@ ytmusicapi
 colorama
 tqdm
 ffmpeg_progress_yield
+python-dotenv
+typer

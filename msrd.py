@@ -21,7 +21,7 @@ def download_audio(cid: str) -> None:
 	s = Song(cid)
 	s.full_download()
 
-@cli.command()
+@cli.command(help="Download music. For more information run `download --help`")
 def download(
 		ids: Annotated[Optional[list[str]], typer.Argument(help="Download the specified songs by their ID (format: ID1 ID2 ID3...)")] = None,
 		dw_all: Annotated[Optional[bool], typer.Option("--all", "-a", help="Download the entire discography of MSR.")] = False,
@@ -47,7 +47,7 @@ def download(
 		list(p_bar)
 		print(f"Download of {p_bar.n} song{'s' if p_bar.n != 1 else ''} finished in {p_bar.format_dict['elapsed']} seconds")
 
-cli.add_typer(cache_command.cli, name="cache")
+cli.add_typer(cache_command.cli, name="cache", help="Make modifications to the cached files. Primarily for deleting old cache files.")
 
 if __name__ == "__main__":
 	cli()

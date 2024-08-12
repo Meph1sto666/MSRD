@@ -111,7 +111,7 @@ class Song:
 		progress_iterator: typing.Iterator[float] = FfmpegProgress(cmd).run_command_with_progress() # type: ignore
 		pbar = tqdm.tqdm(progress_iterator, total=100, desc=f"Converting [{self.song_cid}]", ascii=".#", unit_scale=True, leave=False)
 		if self.__audio_codec not in [".flac", ".wav"]:
-			pbar.write(f"INFO: [{self.song_cid}{self.__audio_codec}] {colorama.Fore.LIGHTRED_EX}ORIGINAL IS NOT LOSSLESS{colorama.Fore.RESET}")
+			pbar.write(f"{colorama.Fore.LIGHTBLUE_EX}INFO{colorama.Fore.RESET}: [{self.song_cid}] {colorama.Fore.LIGHTRED_EX}ORIGINAL IS NOT LOSSLESS{colorama.Fore.RESET}")
 			# pbar.colour = "#ff0000"
 		list(pbar)
 		# for p in progress_iterator:

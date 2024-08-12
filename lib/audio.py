@@ -154,7 +154,7 @@ class Song:
 		return -1
 
 	def __yt_get_song_year(self) -> int:
-		search_res:list[dict[str, typing.Any]] = YTM.search(self.song_title, limit=1) # type: ignore
+		search_res:list[dict[str, typing.Any]] = YTM.search(f"{self.song_title} - {self.song_artists[0] if len(self.song_artists)>0 else '塞壬唱片-MSR'}", limit=1, filter="songs") # type: ignore
 		try:
 			return dt.fromisoformat(YTM.get_song(search_res[0].get("videoId"))["microformat"]["microformatDataRenderer"]["uploadDate"]).year # type: ignore
 		except:

@@ -5,8 +5,11 @@ import shutil
 
 cli: typer.Typer = typer.Typer()
 
-@cli.command()
-def clear(type: str, y: Annotated[bool, typer.Option("--yes", "-y")] = False):
+@cli.command(help="Delete the entire or specified caches of the downloader.")
+def clear(
+		type: Annotated[str, typer.Argument(help="The kind of cache to clear ['audio', 'lyrics', 'cover' or 'all']")],
+		y: Annotated[bool, typer.Option("--yes", "-y", help="Assume yes for the confirm request.")] = False
+	) -> None:
 	if not type in ["audio", "lyrics", "cover"]:
 		typer.pause(f"Specified cache ({type.upper()}) does not exist. Press any key to continue...")
 		return

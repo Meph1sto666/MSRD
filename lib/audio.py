@@ -29,8 +29,8 @@ def _request_album_info(album_id: str|None = None) -> dict[str, typing.Any]:
 def get_song_list() -> list[dict[str, typing.Any]]:
 	return requests.get(f"https://monster-siren.hypergryph.com/api/songs").json()["data"].get("list")
 
-def is_downloaded(cid: str) -> bool:
-	return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{cid}.flac")
+def is_downloaded(cid: str, target_codec: str) -> bool:
+	return os.path.exists(f"./{os.getenv(target_codec.upper() + '_LIBRARY_DIR')}/{cid}.{target_codec}")
 
 class Song:
 	def __init__(self, song_id: str, year_check: bool = True, target_codec: typing.Literal["flac", "m4a", "mp3"] = "flac") -> None:
@@ -59,13 +59,13 @@ class Song:
 		# self.album_artists: int = self.__yt_get_album_artists() if year_check else -1
 		
 		# === CODECS ===
-		self.__target_codec = target_codec
+		self.__target_codec: typing.Literal['flac', 'm4a', 'mp3'] = target_codec
 		self.__audio_codec: str | None = os.path.splitext(self.song_url)[1] if self.song_url else None
 		self.__cover_codec: str = os.path.splitext(self.song_mv_cover_url or self.album_cover_url)[1]		
 		self.__lyrics_ext: str | None = os.path.splitext(self.lyrics_url)[1] if self.lyrics_url else None
 
 	def is_downloaded(self) -> bool:
-		return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{self.song_cid}.flac")
+		return os.path.exists(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}")
 
 	def download_song(self) -> None:
 		if not self.song_url:

@@ -31,6 +31,9 @@ def download(
 	if as_m4a and as_mp3:
 		typer.echo("Cannot use both --mp3 and --m4a flags together", err=True)
 		exit()
+	elif as_m4a: codec = "m4a"
+	elif as_mp3: codec = "mp3"
+	else: codec = "flac"
 	if not ids and not dw_all:
 		typer.pause(f"Please specify the song(s) you want to download. Press any key to continue...")
 		return
@@ -38,7 +41,7 @@ def download(
 	if dw_all:
 		for s in get_song_list()[::-1]:
 			cid: str | None = s.get("cid")
-			if not force and (not cid or is_downloaded(cid)):
+			if not force and (not cid or is_downloaded(cid, codec)):
 				print(f"{colorama.Fore.LIGHTBLUE_EX}INFO{colorama.Fore.RESET}: skipping [{cid}], already downloaded")
 				continue
 			jobs.append(cid)
@@ -47,9 +50,6 @@ def download(
 		jobs = ids
 	with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
 		codec: typing.Literal['flac', 'm4a', 'mp3']
-		if as_m4a: codec = "m4a"
-		elif as_mp3: codec = "mp3"
-		else: codec = "flac"
 		workers: typing.Iterator[None] = executor.map(lambda j: download_audio(j, codec), jobs) # type: ignore
 		p_bar = tqdm.tqdm(workers, total=len(jobs), position=0, ascii=".#", colour="#00ff00")
 		list(p_bar)

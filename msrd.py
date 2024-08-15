@@ -9,16 +9,14 @@ from dotenv import load_dotenv
 from typing_extensions import Annotated, Optional
 from lib.commands import cache as cache_command
 import typer.core
-import os
 import colorama
 load_dotenv()
 
 cli = typer.Typer()
-os.makedirs(os.getenv('LIBRARY_DIR', "./library/flac/"), exist_ok=True)
 # typer.core.rich = None
 
-def download_audio(cid: str) -> None:
-	s = Song(cid)
+def download_audio(cid: str, codec: typing.Literal['flac', 'm4a', 'mp3'] = "flac") -> None:
+	s = Song(cid, target_codec=codec)
 	s.full_download()
 
 @cli.command(help="Download music. For more information run `download --help`")
@@ -26,7 +24,13 @@ def download(
 		ids: Annotated[Optional[list[str]], typer.Argument(help="Download the specified songs by their ID (format: ID1 ID2 ID3...)")] = None,
 		dw_all: Annotated[Optional[bool], typer.Option("--all", "-a", help="Download the entire discography of MSR.")] = False,
 		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already downloaded files")] = False,
-		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel downloads")] = None) -> None:
+		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel downloads")] = None,
+		as_mp3: Annotated[Optional[bool], typer.Option("--mp3", help="Convert to MP3 instead of FLAC, cannot be used with --m4a")] = False,
+		as_m4a: Annotated[Optional[bool], typer.Option("--m4a", help="Convert to M4A instead of FLAC, cannot be used with --mp3")] = False
+	) -> None:
+	if as_m4a and as_mp3:
+		typer.echo("Cannot use both --mp3 and --m4a flags together", err=True)
+		exit()
 	if not ids and not dw_all:
 		typer.pause(f"Please specify the song(s) you want to download. Press any key to continue...")
 		return
@@ -42,7 +46,11 @@ def download(
 		assert ids is not None
 		jobs = ids
 	with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-		workers: typing.Iterator[None] = executor.map(download_audio, jobs)
+		codec: typing.Literal['flac', 'm4a', 'mp3']
+		if as_m4a: codec = "m4a"
+		elif as_mp3: codec = "mp3"
+		else: codec = "flac"
+		workers: typing.Iterator[None] = executor.map(lambda j: download_audio(j, codec), jobs) # type: ignore
 		p_bar = tqdm.tqdm(workers, total=len(jobs), position=0, ascii=".#", colour="#00ff00")
 		list(p_bar)
 		print(f"Download of {p_bar.n} song{'s' if p_bar.n != 1 else ''} finished in {p_bar.format_dict['elapsed']} seconds")

@@ -8,6 +8,11 @@ from datetime import datetime as dt
 # from ffmpeg.ffmpeg import FFmpeg # type: ignore
 from ffmpeg_progress_yield import FfmpegProgress
 from mutagen.flac import FLAC, Picture
+from mutagen.id3 import ID3
+from mutagen.id3._frames import APIC, USLT
+from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4, MP4Cover # type: ignore
+from mutagen.easyid3 import EasyID3
 import tqdm
 import colorama
 YTM:ytmusicapi.YTMusic = ytmusicapi.YTMusic()
@@ -35,7 +40,7 @@ def is_downloaded(cid: str) -> bool:
 	return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{cid}.flac")
 
 class Song:
-	def __init__(self, song_id: str, year_check: bool = True) -> None:
+	def __init__(self, song_id: str, year_check: bool = True, target_codec: typing.Literal["flac", "m4a", "mp3"] = "flac") -> None:
 		self.song_data:dict[str, typing.Any] = _request_song_info(song_id)
 		__song_dta: dict[str, typing.Any] = self.song_data.get("player", {}).get("songDetail", {})
 		__album_dta: dict[str, typing.Any] = self.song_data.get("musicPlay", {}).get("albumDetail", {})
@@ -62,6 +67,7 @@ class Song:
 		# self.album_artists: int = self.__yt_get_album_artists() if year_check else -1
 		
 		# === CODECS ===
+		self.__target_codec = target_codec
 		self.__audio_codec: str | None = os.path.splitext(self.song_url)[1] if self.song_url else None
 		self.__cover_codec: str = os.path.splitext(self.song_mv_cover_url or self.album_cover_url)[1]		
 		self.__lyrics_ext: str | None = os.path.splitext(self.lyrics_url)[1] if self.lyrics_url else None
@@ -103,55 +109,86 @@ class Song:
 				pbar.update(len(c))
 				lrc_file.write(c)
 
-	def convert_to_flac(self) -> None:
+	def convert(self) -> None:
 		os.makedirs(CONVERTED_CACHE, exist_ok=True)
 		in_path: str = f"{AUDIO_CACHE}{self.song_cid}{self.__audio_codec}"
 		# FFmpeg().option("y").input(in_path).output(f"{CONVERTED_CACHE}{self.song_cid}.flac").execute() # type: ignore
-		cmd: list[str] = ["ffmpeg", f"-i", in_path, f"{CONVERTED_CACHE}{self.song_cid}.flac", "-y"]
+		cmd: list[str] = ["ffmpeg", f"-i", in_path, f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}", "-y"]
 		progress_iterator: typing.Iterator[float] = FfmpegProgress(cmd).run_command_with_progress() # type: ignore
 		pbar = tqdm.tqdm(progress_iterator, total=100, desc=f"Converting [{self.song_cid}]", ascii=".#", unit_scale=True, leave=False)
 		if self.__audio_codec not in [".flac", ".wav"]:
 			pbar.write(f"{colorama.Fore.LIGHTBLUE_EX}INFO{colorama.Fore.RESET}: [{self.song_cid}] {colorama.Fore.LIGHTRED_EX}ORIGINAL IS NOT LOSSLESS{colorama.Fore.RESET}")
-			# pbar.colour = "#ff0000"
 		list(pbar)
-		# for p in progress_iterator:
-		# 	pbar.update(p)
-		# pbar.close()
 
-	def add_metadata(self) -> None:
-		operations: int = 8 + (1 if self.lyrics_url else 0)
-		pbar = tqdm.tqdm(total=operations, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
+	def add_metadata_flac(self) -> None:
+		pbar = tqdm.tqdm(total=1, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
 		cover = Picture()
 		audio_file: FLAC = FLAC(f"{CONVERTED_CACHE}{self.song_cid}.flac") # type: ignore
-		pbar.update()
 		with open(f"{COVER_CACHE}{self.song_cid}{self.__cover_codec}", "rb") as f:
 			cover.data = f.read()
 		audio_file["title"] = self.song_title
-		pbar.update()
 		audio_file["artist"] = " & ".join(self.song_artists)
-		pbar.update()
 		# audio_file["album_artist"] = " & ".join(self.album_artists)
 		audio_file["album"] = self.album_title
-		pbar.update()
 		audio_file["date"] = str(self.song_year) if self.song_year > 0 else "Unknown"
-		pbar.update()
 		audio_file["tracknumber"] = str(self.song_position)
-		pbar.update()
 		if self.lyrics_url:
 			lrc_path: str = f"{LYRICS_CACHE}{self.song_cid}{self.__lyrics_ext}"
 			audio_file["LYRICS"] = open(lrc_path, 'r', encoding='utf-8').read()
-			pbar.update()
-		# audio_file["genre"] = "Unknown" # TODO: get genre from YTM API or MusicBrainz
 		audio_file.add_picture(cover) # type: ignore
-		pbar.update()
+		audio_file.save() # type: ignore
+		pbar.close()
+
+	def add_metadata_m4a(self) -> None:
+		pbar = tqdm.tqdm(total=1, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
+		audio_file: MP4 = MP4(f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}") # type: ignore
+		with open(f"{COVER_CACHE}{self.song_cid}{self.__cover_codec}", "rb") as f:
+			audio_file["covr"] = [MP4Cover(f.read())]
+		audio_file["\xa9nam"] = self.song_title
+		audio_file["\xa9ART"] = " & ".join(self.song_artists)
+		# audio_file["aART"] = " & ".join(self.album_artists)
+		audio_file["\xa9alb"] = self.album_title
+		audio_file["\xa9day"] = str(self.song_year) if self.song_year > 0 else "Unknown"
+		audio_file["trkn"] = [(self.song_position, len(self.album_songs))]
+		if self.lyrics_url:
+			lrc_path: str = f"{LYRICS_CACHE}{self.song_cid}{self.__lyrics_ext}"
+			audio_file["\xa9lyr"] = open(lrc_path, 'r', encoding='utf-8').read()
+		audio_file.save() # type: ignore
+		pbar.close()
+
+	def add_metadata_mp3(self) -> None:
+		pbar = tqdm.tqdm(total=1, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
+		
+		audio_path: str = f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}"
+		with open(f"{COVER_CACHE}{self.song_cid}{self.__cover_codec}", "rb") as f:
+			audio_file_cvr: MP3 = MP3(audio_path, ID3=ID3) # type: ignore
+			audio_file_cvr.tags.add(APIC(mime=f'image/{"png" if self.__cover_codec == ".png" else "jpeg"}', type=3, desc=u'Cover', data=f.read())) # type: ignore
+			audio_file_cvr.save() # type: ignore
+
+		audio_file = EasyID3(audio_path)
+		audio_file["title"] = self.song_title
+		audio_file["artist"] = " & ".join(self.song_artists)
+		# audio_file["albumartist"] = " & ".join(self.album_artists)
+		audio_file["album"] = self.album_title
+		audio_file["date"] = str(self.song_year) if self.song_year > 0 else "Unknown"
+		audio_file["tracknumber"] = [(self.song_position, len(self.album_songs))]
+		if self.lyrics_url:
+			lrc_path: str = f"{LYRICS_CACHE}{self.song_cid}{self.__lyrics_ext}"
+			tag = ID3(audio_path)
+			# tag.setall("SYLT", [SYLT(encoding=3, lang="eng", format=2, type=1, text=open(lrc_path, 'r', encoding='utf-8').read())]) # type: ignore
+			tag.setall("USLT", [USLT(encoding=3, format=2, type=1, text=open(lrc_path, 'r', encoding='utf-8').read())]) # type: ignore
+			tag.save() # type: ignore
 		audio_file.save() # type: ignore
 		pbar.close()
 
 	def full_download(self) -> None:
-		jobs: list[typing.Callable[[], None]] = [self.download_song, self.download_cover, self.download_lyrics, self.convert_to_flac, self.add_metadata]
-		for j in jobs:
-			j()
-		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}.flac", f"./{os.getenv('LIBRARY_DIR')}/{self.song_cid}.flac")
+		self.download_song()
+		self.download_cover()
+		self.download_lyrics()
+		self.convert()
+		getattr(self, f"add_metadata_{self.__target_codec}")()
+		os.makedirs(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/", exist_ok=True)
+		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}", f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}")
 
 	def __get_song_position(self) -> int:
 		for i, song in enumerate(self.album_songs):

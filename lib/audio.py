@@ -1,7 +1,5 @@
 import os
 import requests
-import re
-import json
 import typing
 import ytmusicapi # type: ignore
 from datetime import datetime as dt
@@ -23,27 +21,21 @@ LYRICS_CACHE = "data/cache/lyrics/"
 CONVERTED_CACHE = "data/cache/converted/"
 
 def _request_song_info(song_id: str|None = None) -> dict[str, typing.Any]:
-	res: str = requests.get(f"https://monster-siren.hypergryph.com/{'music/'+song_id if song_id else ''}").text
-	data: re.Match[str]|None = re.search(r"(?<=window\.g_initialProps = )[\s\S]+(?=;\n\s*<\/script>)", res, flags = re.UNICODE)
-	if data is None:
-		raise Exception("Failed to retrieve song informations")
-	converted_data: str = re.sub(r"(?<=:)undefined(?=,)", "\"none\"", data.group()) # convert "undefined" to "none" cuz we don't like JS /s
-	return json.loads(converted_data)
+	return requests.get(f"https://monster-siren.hypergryph.com/api/song/{song_id}").json()["data"]
+	
+def _request_album_info(album_id: str|None = None) -> dict[str, typing.Any]:
+	return requests.get(f"https://monster-siren.hypergryph.com/api/album/{album_id}/detail").json()["data"]
 
 def get_song_list() -> list[dict[str, typing.Any]]:
-	song_list: list[dict[str, typing.Any]] = _request_song_info().get("player", {}).get("list", [])
-	if len(song_list) < 1:
-		raise Exception("No songs found in list")
-	return song_list
+	return requests.get(f"https://monster-siren.hypergryph.com/api/songs").json()["data"].get("list")
 
 def is_downloaded(cid: str) -> bool:
 	return os.path.exists(f"{os.getenv('LIBRARY_DIR')}/{cid}.flac")
 
 class Song:
 	def __init__(self, song_id: str, year_check: bool = True, target_codec: typing.Literal["flac", "m4a", "mp3"] = "flac") -> None:
-		self.song_data:dict[str, typing.Any] = _request_song_info(song_id)
-		__song_dta: dict[str, typing.Any] = self.song_data.get("player", {}).get("songDetail", {})
-		__album_dta: dict[str, typing.Any] = self.song_data.get("musicPlay", {}).get("albumDetail", {})
+		__song_dta: dict[str, typing.Any] = _request_song_info(song_id)
+		__album_dta: dict[str, typing.Any] = _request_album_info(__song_dta.get("albumCid"))
 
 		# === ALBUM DATA ===
 		self.album_cid: str = __album_dta.get("cid", "NONE")

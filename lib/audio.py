@@ -1,3 +1,4 @@
+import atexit
 import os
 import requests
 import typing
@@ -11,11 +12,20 @@ from mutagen.easyid3 import EasyID3
 import tqdm
 import colorama
 from pathlib import Path
+import json
+import datetime as dt
 
+LOOKUP_PATH = Path("db.json")
 AUDIO_CACHE = Path("data/cache/audio/")
 COVER_CACHE = Path("data/cache/cover/")
 LYRICS_CACHE = Path("data/cache/lyrics/")
 CONVERTED_CACHE = Path("data/cache/converted/")
+
+if not LOOKUP_PATH.exists():
+    LOOKUP_PATH.write_text("{}")
+LOOKUP: dict[str, dict[str, bool | dt.datetime]] = json.load(LOOKUP_PATH.open())
+
+_ = atexit.register(lambda: json.dump(LOOKUP, LOOKUP_PATH.open("w")))
 
 
 def _request_song_info(song_id: str | None = None) -> dict[str, typing.Any]:
@@ -39,9 +49,16 @@ def get_song_list() -> list[dict[str, typing.Any]]:
 
 
 def is_downloaded(cid: str, target_codec: str) -> bool:
-    return os.path.exists(
-        f"./{os.getenv(target_codec.upper() + '_LIBRARY_DIR')}/{cid}.{target_codec}"
-    )
+    entry = LOOKUP.get(cid)
+    if not entry:
+        return False
+    codecs = entry.get("codecs", [])
+    if isinstance(codecs, list):
+        return target_codec in entry.get("codecs", [])
+    return False
+    # return os.path.exists(
+    #     f"./{os.getenv(target_codec.upper() + '_LIBRARY_DIR')}/{cid}.{target_codec}"
+    # )
 
 
 class Song:
@@ -277,6 +294,9 @@ class Song:
             f"./{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}",
             f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}",
         )
+        entry = LOOKUP.get(self.song_cid, {})
+        entry["codecs"] = entry.get("codecs", []) + [self.__target_codec]
+        LOOKUP[self.song_cid] = entry
 
     def full_convert(self) -> bool:
         if not self.is_cached():

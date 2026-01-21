@@ -15,7 +15,7 @@ load_dotenv()
 cli = typer.Typer(no_args_is_help=True)
 # typer.core.rich = None
 
-AudioFormat = typing.Literal['flac', 'alac', 'm4a', 'mp3']
+AudioFormat = typing.Literal['flac', 'alac', 'aac', 'mp3']
 
 def download_audio(cid: str, codec: AudioFormat = "flac") -> None:
 	s = Song(cid, target_codec=codec)
@@ -32,7 +32,7 @@ def download(
 		dw_all: Annotated[Optional[bool], typer.Option("--all", "-a", help="Download the entire discography of MSR.")] = False,
 		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already downloaded files")] = False,
 		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel downloads")] = None,
-		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, m4a, mp3)")] = "flac",
+		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, aac, mp3)")] = "flac",
 	) -> None:
 	codec = fmt
 	if not ids and not dw_all:
@@ -62,7 +62,7 @@ def convert(
 		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already converted files")] = False,
 		allow_download: Annotated[Optional[bool], typer.Option("--download", "-d", help="Allow downloading the song if it does not exist")] = False,
 		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel conversions")] = None,
-		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, m4a, mp3)")] = "flac",
+		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, aac, mp3)")] = "flac",
 	) -> None:
 	codec = fmt
 	if not ids and not convert_all:

@@ -13,6 +13,7 @@ from mutagen.id3._frames import APIC, USLT
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover  # type: ignore
 
+from ..msrd import AudioFormat
 
 AUDIO_CACHE = "data/cache/audio/"
 COVER_CACHE = "data/cache/cover/"
@@ -33,11 +34,11 @@ def _has_libfdk_aac() -> bool:
 
 _HAS_LIBFDK_AAC = _has_libfdk_aac()
 
-FFMPEG_PRESETS: dict[str, tuple[str, list[str]]] = {
+FFMPEG_PRESETS: dict[AudioFormat, tuple[str, list[str]]] = {
 	# format: (extension, ffmpeg_options)
 	"flac": (".flac", ["-compression_level", "8"]),
 	"alac": (".m4a",  ["-c:a", "alac"]),
-	"m4a":  (".m4a",  ["-c:a", "libfdk_aac", "-b:a", "192k"] if _HAS_LIBFDK_AAC else ["-c:a", "aac", "-b:a", "192k"]),
+	"aac":  (".m4a",  ["-c:a", "libfdk_aac", "-b:a", "192k"] if _HAS_LIBFDK_AAC else ["-c:a", "aac", "-b:a", "192k"]),
 	"mp3":  (".mp3",  ["-c:a", "libmp3lame", "-b:a", "320k"]),
 }
 
@@ -63,7 +64,7 @@ class Song:
 		self,
 		song_id: str,
 		year_check: bool = True,
-		target_codec: typing.Literal["flac", "alac", "m4a", "mp3"] = "flac",
+		target_codec: AudioFormat = "flac",
 	) -> None:
 		__song_dta: dict[str, typing.Any] = _request_song_info(song_id)
 		__album_dta: dict[str, typing.Any] = _request_album_info(__song_dta.get("albumCid"))

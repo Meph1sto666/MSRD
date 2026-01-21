@@ -1,5 +1,6 @@
 import os
 import requests
+import subprocess
 import typing
 from ffmpeg_progress_yield import FfmpegProgress
 from mutagen.flac import FLAC, Picture
@@ -16,9 +17,28 @@ COVER_CACHE = "data/cache/cover/"
 LYRICS_CACHE = "data/cache/lyrics/"
 CONVERTED_CACHE = "data/cache/converted/"
 
+# Check if libfdk_aac is available (which is best AAC encoder in world, but hard to install).
+# pass `--with-fdk-aac` to `brew install` if you're on macOS.
+def _has_libfdk_aac() -> bool:
+	try:
+		result = subprocess.run(["ffmpeg", "-encoders"], capture_output=True, text=True)
+		return "libfdk_aac" in result.stdout
+	except Exception:
+		return False
+
+_HAS_LIBFDK_AAC = _has_libfdk_aac()
+
+FFMPEG_PRESETS: dict[str, tuple[str, list[str]]] = {
+	# format: (extension, ffmpeg_options)
+	"flac": (".flac", ["-compression_level", "8"]),
+	"alac": (".m4a",  ["-c:a", "alac"]),
+	"m4a":  (".m4a",  ["-c:a", "libfdk_aac", "-b:a", "192k"] if _HAS_LIBFDK_AAC else ["-c:a", "aac", "-b:a", "192k"]),
+	"mp3":  (".mp3",  ["-c:a", "libmp3lame", "-b:a", "320k"]),
+}
+
 def _request_song_info(song_id: str|None = None) -> dict[str, typing.Any]:
 	return requests.get(f"https://monster-siren.hypergryph.com/api/song/{song_id}").json()["data"]
-	
+
 def _request_album_info(album_id: str|None = None) -> dict[str, typing.Any]:
 	return requests.get(f"https://monster-siren.hypergryph.com/api/album/{album_id}/detail").json()["data"]
 
@@ -29,7 +49,7 @@ def is_downloaded(cid: str, target_codec: str) -> bool:
 	return os.path.exists(f"./{os.getenv(target_codec.upper() + '_LIBRARY_DIR')}/{cid}.{target_codec}")
 
 class Song:
-	def __init__(self, song_id: str, year_check: bool = True, target_codec: typing.Literal["flac", "m4a", "mp3"] = "flac") -> None:
+	def __init__(self, song_id: str, year_check: bool = True, target_codec: typing.Literal["flac", "alac", "m4a", "mp3"] = "flac") -> None:
 		__song_dta: dict[str, typing.Any] = _request_song_info(song_id)
 		__album_dta: dict[str, typing.Any] = _request_album_info(__song_dta.get("albumCid"))
 
@@ -53,15 +73,16 @@ class Song:
 		# === YTM DATA ===
 		self.song_year: int = self.__get_song_year() if year_check else -1
 		# self.album_artists: int = self.__yt_get_album_artists() if year_check else -1
-		
+
 		# === CODECS ===
-		self.__target_codec: typing.Literal['flac', 'm4a', 'mp3'] = target_codec
+		self.__target_codec: typing.Literal['flac', 'alac', 'm4a', 'mp3'] = target_codec
+		self.__target_ext: str = FFMPEG_PRESETS[target_codec][0]
 		self.__audio_codec: str | None = os.path.splitext(self.song_url)[1] if self.song_url else None
-		self.__cover_codec: str = os.path.splitext(self.song_mv_cover_url or self.album_cover_url)[1]		
+		self.__cover_codec: str = os.path.splitext(self.song_mv_cover_url or self.album_cover_url)[1]
 		self.__lyrics_ext: str | None = os.path.splitext(self.lyrics_url)[1] if self.lyrics_url else None
 
 	def is_downloaded(self) -> bool:
-		return os.path.exists(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}")
+		return os.path.exists(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}{self.__target_ext}")
 
 	def download_song(self) -> None:
 		if not self.song_url:
@@ -100,8 +121,8 @@ class Song:
 	def convert(self) -> None:
 		os.makedirs(CONVERTED_CACHE, exist_ok=True)
 		in_path: str = f"{AUDIO_CACHE}{self.song_cid}{self.__audio_codec}"
-		# FFmpeg().option("y").input(in_path).output(f"{CONVERTED_CACHE}{self.song_cid}.flac").execute() # type: ignore
-		cmd: list[str] = ["ffmpeg", f"-i", in_path, f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}", "-y"]
+		ext, opts = FFMPEG_PRESETS[self.__target_codec]
+		cmd: list[str] = ["ffmpeg", "-i", in_path, *opts, f"{CONVERTED_CACHE}{self.song_cid}{ext}", "-y"]
 		progress_iterator: typing.Iterator[float] = FfmpegProgress(cmd).run_command_with_progress() # type: ignore
 		pbar = tqdm.tqdm(progress_iterator, total=100, desc=f"Converting [{self.song_cid}]", ascii=".#", unit_scale=True, leave=False)
 		if self.__audio_codec not in [".flac", ".wav"]:
@@ -129,7 +150,7 @@ class Song:
 
 	def add_metadata_m4a(self) -> None:
 		pbar = tqdm.tqdm(total=1, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
-		audio_file: MP4 = MP4(f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}") # type: ignore
+		audio_file: MP4 = MP4(f"{CONVERTED_CACHE}{self.song_cid}{self.__target_ext}") # type: ignore
 		with open(f"{COVER_CACHE}{self.song_cid}{self.__cover_codec}", "rb") as f:
 			audio_file["covr"] = [MP4Cover(f.read())]
 		audio_file["\xa9nam"] = self.song_title
@@ -146,8 +167,8 @@ class Song:
 
 	def add_metadata_mp3(self) -> None:
 		pbar = tqdm.tqdm(total=1, desc=f"Adding metadata [{self.song_cid}]", ascii=".#", leave=False)
-		
-		audio_path: str = f"{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}"
+
+		audio_path: str = f"{CONVERTED_CACHE}{self.song_cid}{self.__target_ext}"
 		with open(f"{COVER_CACHE}{self.song_cid}{self.__cover_codec}", "rb") as f:
 			audio_file_cvr: MP3 = MP3(audio_path, ID3=ID3) # type: ignore
 			audio_file_cvr.tags.add(APIC(mime=f'image/{"png" if self.__cover_codec == ".png" else "jpeg"}', type=3, desc=u'Cover', data=f.read())) # type: ignore
@@ -174,17 +195,19 @@ class Song:
 		self.download_cover()
 		self.download_lyrics()
 		self.convert()
-		getattr(self, f"add_metadata_{self.__target_codec}")()
+		metadata_method = "m4a" if self.__target_codec == "alac" else self.__target_codec
+		getattr(self, f"add_metadata_{metadata_method}")()
 		os.makedirs(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/", exist_ok=True)
-		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}", f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}")
+		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}{self.__target_ext}", f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}{self.__target_ext}")
 
 	def full_convert(self) -> bool:
 		if not self.is_cached():
 			return False
 		self.convert()
-		getattr(self, f"add_metadata_{self.__target_codec}")()
+		metadata_method = "m4a" if self.__target_codec == "alac" else self.__target_codec
+		getattr(self, f"add_metadata_{metadata_method}")()
 		os.makedirs(f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/", exist_ok=True)
-		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}.{self.__target_codec}", f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}.{self.__target_codec}")
+		os.replace(f"./{CONVERTED_CACHE}{self.song_cid}{self.__target_ext}", f"./{os.getenv(self.__target_codec.upper() + '_LIBRARY_DIR')}/{self.song_cid}{self.__target_ext}")
 		return True
 
 	def is_cached(self) -> bool:
@@ -203,4 +226,3 @@ class Song:
 	# def __yt_get_album_artists(self) -> None:
 	# 	return
 	# 	search_res:list[dict[str, typing.Any]] = YTM.search(self.song_title, limit=1) # type: ignore
-		

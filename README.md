@@ -3,6 +3,7 @@
 ## Requirements
 - Python (3.10.6 tested, other versions probably work just as fine)
 - [FFmpeg](https://github.com/BtbN/FFmpeg-Builds/releases), installed and in system PATH
+- [uv](https://docs.astral.sh/uv/getting-started/installation/), the Python package manager
 
 You can grab the requirements directly or, alternatively, through [scoop](https://scoop.sh/)/winget, which is preinstalled on windows 10 (1809 or later). If you choose to use scoop, follow [this guide](./docs/scoop.md).
 
@@ -24,15 +25,15 @@ Follow for example [these instructions](https://phoenixnap.com/kb/ffmpeg-windows
 ## Use it
 
 1. Run `msrd.bat` this will open a new console in which you can use the downloader.
-2. To see the commands type `python msrd.py --help` and run it. This will show a small help menu.
+2. To see the commands type `uv run python msrd.py --help` and run it. This will show a small help menu.
 
 Example commands are
-- `python msrd.py download 232244 953983` Download the song with the ID `232244` and `953983`
-- `python msrd.py download 953986 --m4a` Download the song with the ID `953986` as m4a
-- `python msrd.py convert -a --mp3` Convert songs to mp3.
-- `python msrd.py convert -a -d --m4a` Convert songs (and re-download them if the cache has been cleared) to m4a.
-- `python msrd.py download -a -t 2` Download all songs with two threads.
-- `python msrd.py cache clear audio` Clear/delete the audio files the program worked with (don't worry the finished songs will not be deleted).
+- `uv run python msrd.py download 232244 953983` Download the song with the ID `232244` and `953983`
+- `uv run python msrd.py download 953986 --m4a` Download the song with the ID `953986` as m4a
+- `uv run python msrd.py convert -a --mp3` Convert songs to mp3.
+- `uv run python msrd.py convert -a -d --m4a` Convert songs (and re-download them if the cache has been cleared) to m4a.
+- `uv run python msrd.py download -a -t 2` Download all songs with two threads.
+- `uv run python msrd.py cache clear audio` Clear/delete the audio files the program worked with (don't worry the finished songs will not be deleted).
 
 If you have a slow drive or internet I recommend limiting the threads depending on your specs.
 > Downloading the entire Discography (as of 2024.09.12, 598 songs) at 55Mb/s with 16 threads took 58min.
@@ -43,10 +44,8 @@ Contributions and improvements are very welcome.
 
 1. Fork the repo
 2. Make sure you are on the dev branch `git checkout dev`
-3. Create the virtual environment `python -m venv venv`
-4. Activate it `venv\Scripts\activate`
-5. Install the requirements `pip install -r requirements.txt`
-6. Make your changes
-7. Pull requests should as well be on a separate branch like _dev_
+3. Install dependencies with `uv sync`
+4. Make your changes
+5. Pull requests should as well be on a separate branch like _dev_
 
 > _This project is not affiliated with Hypergryph, Studio Montagne, Yostar or Gryphline in any ways._

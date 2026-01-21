@@ -1,3 +1,3 @@
 @ECHO OFF
-CALL venv\Scripts\activate
-CMD /k python msrd.py --help
+cd %~dp0
+CMD /k uv run python msrd.py --help

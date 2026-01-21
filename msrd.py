@@ -15,11 +15,13 @@ load_dotenv()
 cli = typer.Typer(no_args_is_help=True)
 # typer.core.rich = None
 
-def download_audio(cid: str, codec: typing.Literal['flac', 'm4a', 'mp3'] = "flac") -> None:
+AudioFormat = typing.Literal['flac', 'alac', 'aac', 'mp3']
+
+def download_audio(cid: str, codec: AudioFormat = "flac") -> None:
 	s = Song(cid, target_codec=codec)
 	s.full_download()
 
-def convert_audio(cid: str, codec: typing.Literal['flac', 'm4a', 'mp3'] = "flac", allow_download: bool = False) -> None:
+def convert_audio(cid: str, codec: AudioFormat = "flac", allow_download: bool = False) -> None:
 	s = Song(cid, target_codec=codec)
 	if not s.full_convert() and allow_download:
 		s.full_download()
@@ -30,15 +32,9 @@ def download(
 		dw_all: Annotated[Optional[bool], typer.Option("--all", "-a", help="Download the entire discography of MSR.")] = False,
 		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already downloaded files")] = False,
 		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel downloads")] = None,
-		as_mp3: Annotated[Optional[bool], typer.Option("--mp3", help="Convert to MP3 instead of FLAC, cannot be used with --m4a")] = False,
-		as_m4a: Annotated[Optional[bool], typer.Option("--m4a", help="Convert to M4A instead of FLAC, cannot be used with --mp3")] = False
+		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, aac, mp3)")] = "flac",
 	) -> None:
-	if as_m4a and as_mp3:
-		typer.echo("Cannot use both --mp3 and --m4a flags together", err=True)
-		exit()
-	elif as_m4a: codec = "m4a"
-	elif as_mp3: codec = "mp3"
-	else: codec = "flac"
+	codec = fmt
 	if not ids and not dw_all:
 		typer.pause(f"Please specify the song(s) you want to download. Press any key to continue...")
 		return
@@ -54,7 +50,6 @@ def download(
 		assert ids is not None
 		jobs = ids
 	with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-		codec: typing.Literal['flac', 'm4a', 'mp3']
 		workers: typing.Iterator[None] = executor.map(lambda j: download_audio(j, codec), jobs) # type: ignore
 		p_bar = tqdm.tqdm(workers, total=len(jobs), position=0, ascii=".#", colour="#00ff00")
 		list(p_bar)
@@ -67,15 +62,9 @@ def convert(
 		force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite already converted files")] = False,
 		allow_download: Annotated[Optional[bool], typer.Option("--download", "-d", help="Allow downloading the song if it does not exist")] = False,
 		threads: Annotated[Optional[int], typer.Option("--threads", "-t", help="Specify the maximum amount of parallel conversions")] = None,
-		to_mp3: Annotated[Optional[bool], typer.Option("--mp3", help="Convert to MP3 instead of FLAC, cannot be used with --m4a")] = False,
-		to_m4a: Annotated[Optional[bool], typer.Option("--m4a", help="Convert to M4A instead of FLAC, cannot be used with --mp3")] = False
+		fmt: Annotated[AudioFormat, typer.Option("--format", "-F", help="Output format (default=flac; alac, aac, mp3)")] = "flac",
 	) -> None:
-	if to_m4a and to_mp3:
-		typer.echo("Cannot use both --mp3 and --m4a flags together", err=True)
-		exit()
-	elif to_m4a: codec = "m4a"
-	elif to_mp3: codec = "mp3"
-	else: codec = "flac"
+	codec = fmt
 	if not ids and not convert_all:
 		typer.pause(f"Please specify the song(s) you want to convert. Press any key to continue...")
 		return
@@ -91,7 +80,6 @@ def convert(
 		assert ids is not None
 		jobs = ids
 	with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-		codec: typing.Literal['flac', 'm4a', 'mp3']
 		workers: typing.Iterator[None] = executor.map(lambda j: convert_audio(j, codec, allow_download), jobs) # type: ignore
 		p_bar = tqdm.tqdm(workers, total=len(jobs), position=0, ascii=".#", colour="#00ff00")
 		list(p_bar)

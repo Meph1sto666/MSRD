@@ -28,9 +28,9 @@ Follow for example [these instructions](https://phoenixnap.com/kb/ffmpeg-windows
 
 Example commands are
 - `python msrd.py download 232244 953983` Download the song with the ID `232244` and `953983`
-- `python msrd.py download 953986 --m4a` Download the song with the ID `953986` as m4a
-- `python msrd.py convert -a --mp3` Convert songs to mp3.
-- `python msrd.py convert -a -d --m4a` Convert songs (and re-download them if the cache has been cleared) to m4a.
+- `python msrd.py download 953986 --format=aac` Download the song with the ID `953986` as aac (.m4a)
+- `python msrd.py convert -a --format=mp3` Convert songs to mp3.
+- `python msrd.py convert -a -d --format=alac` Convert songs (and re-download them if the cache has been cleared) to alac.
 - `python msrd.py download -a -t 2` Download all songs with two threads.
 - `python msrd.py cache clear audio` Clear/delete the audio files the program worked with (don't worry the finished songs will not be deleted).
 

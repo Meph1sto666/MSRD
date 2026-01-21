@@ -1,0 +1,18 @@
+[project]
+name = "msrd"
+version = "0.1.0"
+description = "MSR Discography Downloader"
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "mutagen",
+    "colorama",
+    "tqdm",
+    "ffmpeg-progress-yield",
+    "python-dotenv",
+    "typer",
+]
+
+[project.scripts]
+msrd = "msrd:cli"
+
